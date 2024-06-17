@@ -4,63 +4,82 @@ import psycopg2
 from prettytable import PrettyTable
 from anytree import Node, RenderTree
 
-def view( conn, dbType ):
+def view(conn, dbType):
     cursor = conn.cursor()
 
+    root = Node("Database")
+
     if dbType == 'postgresql':
-        cursor.execute( """
+        cursor.execute("""
                        SELECT table_name
                        FROM information_schema.tables
                        WHERE table_schema = 'public'
+                       AND table_type = 'BASE TABLE'
                     """)
-        
-    elif dbType == 'mysql':
-        cursor.execute("SHOW TABLES")
-
-    tables = cursor.fetchall()
-    
-    root = Node("Database")
-    for table in tables:
-        print(f'Tabela: {table[0]}')
+        tables = cursor.fetchall()
 
         cursor.execute("""
-                       SELECT column_name, data_type, character_maximum_length, is_nullable
-                       FROM INFORMATION_SCHEMA.COLUMNS 
-                       WHERE table_name = '{table[0]'}
+                       SELECT table_name
+                       FROM information_schema.views
+                       WHERE table_schema = 'public'
                     """)
-        
-        columns = cursor.fetchall()
-        t = PrettyTable(['Column', 'Type','Size', 'Null'])
+        views = cursor.fetchall()
 
-        tableNode = Node(table[0], parent = root)
+        for table in tables:
+            table_name = table[0]
+            table_node = Node(table_name, parent=root)
 
-        for column in columns:
-            size = column[2] if len(column) > 2 else ''
-            null = column[3] if len(column) > 3 else ''
-            t.add_row([column[0], column[1], size, null])
-
-            Node(f'{column[0]}: column[1]', parent = tableNode)
-        print(t)
-
-        if dbType == 'postgresql':
             cursor.execute(f"""
-                        SELECT kcu.column_name
-                        FROM information_schema.table_constraints tc 
-                        JOIN information_schema.key_column_usage kcu 
-                        ON tc.constraint_name = kcu.constraint_name
-                        WHERE tc.table_name = '{table[0]}' AND tc.constraint_type = 'PRIMARY KEY'
-                    """)
-        elif dbType == 'mysql':
-            cursor.execute(f"""
-                        SELECT column_name
-                        FROM information_schema.key_column_usage
-                        WHERE table_name = '{table[0]}' AND constraint_name = 'PRIMARY'
-                    """)
-        
-        primaryKeys = cursor.fetchall()
-        if primaryKeys:
-            print("Primary Keys:", ", ".join([chave[0] for chave in primaryKeys]))
-        print("\n")
+                           SELECT column_name, data_type, character_maximum_length, is_nullable
+                           FROM information_schema.columns 
+                           WHERE table_name = '{table_name}'
+                        """)
+            columns = cursor.fetchall()
+
+            t = PrettyTable(['Column', 'Type', 'Size', 'Null'])
+            for column in columns:
+                size = column[2] if len(column) > 2 else ''
+                null = column[3] if len(column) > 3 else ''
+                t.add_row([column[0], column[1], size, null])
+                Node(f'{column[0]}: {column[1]}', parent=table_node)
+            print(f'Table: {table_name}')
+            print(t)
+
+        for view in views:
+            view_name = view[0]
+            view_node = Node(view_name, parent=root)
+            print(f'View: {view_name}')
+
+    elif dbType == 'mysql':
+        cursor.execute("SHOW TABLES")
+        tables = cursor.fetchall()
+
+        cursor.execute("SHOW FULL TABLES WHERE Table_type = 'VIEW'")
+        views = cursor.fetchall()
+
+        for table in tables:
+            table_name = table[0]
+            table_node = Node(table_name, parent=root)
+
+            cursor.execute(f"DESCRIBE {table_name}")
+            columns = cursor.fetchall()
+
+            t = PrettyTable(['Field', 'Type', 'Null', 'Key', 'Default', 'Extra'])
+            for column in columns:
+                t.add_row(column)
+                Node(f'{column[0]}: {column[1]}', parent=table_node)
+            print(f'Table: {table_name}')
+            print(t)
+
+        for view in views:
+            view_name = view[0]
+            view_node = Node(view_name, parent=root)
+            print(f'View: {view_name}')
+
+    for pre, fill, node in RenderTree(root):
+        print(f"{pre}{node.name}")
+
+    print("\n")
 
 def checkData(conn, table, range = 1000):
     cursor = conn.cursor()

@@ -1,3 +1,4 @@
+import os
 import mysql.connector 
 import psycopg2
 import json
@@ -5,7 +6,7 @@ import json
 from mysql.connector import Error
 from psycopg2 import OperationalError
 
-def mysqlConnect( userName, userPassword, dbName, hostName = None, portName = None ):
+def mysqlConnect( userName, userPassword, dbName, hostName, portName):
     connection = None
 
     try:
@@ -20,7 +21,7 @@ def mysqlConnect( userName, userPassword, dbName, hostName = None, portName = No
         print(f'Erro de conexao: {e}')
     return connection
 
-def postgresqlConnect( userName, userPassword, dbName, hostName = None, portName = None ):
+def postgresqlConnect( userName, userPassword, dbName, hostName, portName):
     connection = None
     try:
         connection = psycopg2.connect(
@@ -35,10 +36,16 @@ def postgresqlConnect( userName, userPassword, dbName, hostName = None, portName
         print(f'Erro de conexao {e}')
     return connection
 
-def loadJson( file = 'connections.json' ):
+def loadJson(file='connections.json'):
+    if not os.path.exists(file):
+        return None
+
+    if os.path.getsize(file) == 0:
+        return None
+
     with open(file, 'r') as f:
         return json.load(f)
 
-def loadJson( dados, file = 'connections.json' ):
+def saveJson( dados, file = 'connections.json' ):
     with open(file, 'w') as f:
         return json.dump(dados, f)
