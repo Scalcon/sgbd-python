@@ -1,0 +1,12 @@
+Esse software depende dos seguintes pacotes:
+json,
+anytree,
+prettytable,
+mysql.connector,
+from mysql.connector: Error,
+psycopg2,
+from psycopg2: OperationalError,
+getpass.
+
+
+
